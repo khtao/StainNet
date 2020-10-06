@@ -20,11 +20,6 @@ pip install -r requirements.txt
 
 ## 4、Testing and Training
 
-###  download dataset and pretrained models
-
-```shell
-链接: https://pan.baidu.com/s/1BbIqSldKRaofWEVb7_Rm_A  密码: wqtb
-```
 
 ### Run all tests
 
