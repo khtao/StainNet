@@ -2,7 +2,7 @@
 
 ## 1、Our approach
 
-![stainnet](readme.assets/stainnet-1601983113087.jpg)
+![stainnet](readme.assets/stainnet.jpg)
 
 ## 2、Our results
 
