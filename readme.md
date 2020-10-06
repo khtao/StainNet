@@ -1,16 +1,14 @@
-
-
 # StainNet: Robust and Fast Stain Normalization Network
 
 ## 1、Our approach
 
-![stainnet22](readme.assets/stainnet22.png)
+![stainnet](readme.assets/stainnet-1601983113087.jpg)
 
 ## 2、Our results
 
-![宫颈 - 副本](readme.assets/宫颈 - 副本.png)
+![Cytopathology](readme.assets/Cytopathology.jpg)
 
-![乳腺 - 副本](readme.assets/鲁棒性对比.png)
+![hist](readme.assets/hist.jpg)
 
 ## 3、Requirements
 
