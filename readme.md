@@ -12,7 +12,7 @@
 
 ## 3、Requirements
 
-Python 3.6 or later with all [requirements.txt](https://github.com/khtao/StainNet/master/requirements.txt) dependencies installed, including `torch>=1.0`. To install run:
+Python 3.6 or later with all [requirements.txt](https://github.com/khtao/StainNet/requirements.txt) dependencies installed, including `torch>=1.0`. To install run:
 
 ```bash
 pip install -r requirements.txt
