@@ -144,13 +144,13 @@ def test_traditional_fps(source_img, ref_img, method, n_iters):
 
 
 print("test StainNet FPS")
-test_deeplearning_fps(model_Net, 600, 100)
+test_deeplearning_fps(model_Net, 500, 100)
 
 # In[14]:
 
 
 print("test StainGAN FPS")
-test_deeplearning_fps(model_GAN, 200, 10)
+test_deeplearning_fps(model_GAN, 100, 10)
 
 # In[17]:
 
