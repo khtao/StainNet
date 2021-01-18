@@ -4,7 +4,7 @@
 
 ![stainnet](assets/stainnet.jpg)
 
-You can see the [demo.ipynb][demo.ipynb] for details
+You can see the [demo.ipynb](demo.ipynb) for details
 
 ## 3、Requirements
 
