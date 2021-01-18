@@ -1,12 +1,14 @@
 # StainNet: a fast and robust stain normalization network
 
+The code for StainNet with url: https://arxiv.org/abs/2012.12535
+
 ## 1、Our approach
 
 ![stainnet](assets/stainnet.png)
 
 You can see the [demo.ipynb](demo.ipynb) for details
 
-## 3、Requirements
+## 2、Requirements
 
 Python 3.6 or later with all [requirements.txt](https://github.com/khtao/StainNet/blob/master/requirements.txt) dependencies installed, including `torch>=1.0`. To install run:
 
@@ -14,7 +16,7 @@ Python 3.6 or later with all [requirements.txt](https://github.com/khtao/StainNe
 pip install -r requirements.txt
 ```
 
-## 4、Testing and Training
+## 3、Testing and Training
 
 ```bash
 python test.py -h
