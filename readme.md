@@ -2,7 +2,7 @@
 
 ## 1、Our approach
 
-![stainnet](assets/stainnet.jpg)
+![stainnet](assets/stainnet.png)
 
 You can see the [demo.ipynb](demo.ipynb) for details
 
