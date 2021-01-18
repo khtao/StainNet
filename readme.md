@@ -1,4 +1,4 @@
-# StainNet: Robust and Fast Stain Normalization Network
+# StainNet: A Robust and Fast Stain Normalization Network
 
 ## 1、Our approach
 
