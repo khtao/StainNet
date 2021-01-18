@@ -11,42 +11,35 @@ from tqdm import tqdm
 from models import StainNet
 from utils import ImageDataset
 from utils import Visualizer
-import os
-
-
-def peak_signal_noise_ratio(image_true, image_test, data_range=None):
-    err = torch.nn.MSELoss()(image_true, image_test)
-    return 10 * torch.log10((data_range ** 2) / err)
+from utils import compute_psnr_and_ssim
 
 
 def test(model, test_dataloader):
+    model.eval()
     total = len(test_dataloader)
-    mean_metric = {}
+    mean_psnr, mean_ssim = 0.0, 0.0
     test_data = 0
     for i, (image, image_ori) in tqdm(enumerate(test_dataloader), total=total):
-        image_ori = image_ori.cuda()
-        image_ori = image_ori * 0.5 + 0.5
-        image = image.cuda()
-        test_data += int(image.size(0))
-        for jj in range(2, 6):
-            for ii in range(3, 8):
-                key = str(jj) + str(ii)
-                model[key].eval()
-                if key not in mean_metric.keys():
-                    mean_metric[key] = 0
-                with torch.no_grad():
-                    image_out = model[key](image)
-                    image_out = image_out * 0.5 + 0.5
-                    for ori, out in zip(image_ori, image_out):
-                        ori = ori * 255.0
-                        out = out * 255.0
-                        psnr = peak_signal_noise_ratio(ori, out, data_range=255)
-                        mean_metric[key] += psnr
-    for jj in range(2, 6):
-        for ii in range(3, 8):
-            key = str(jj) + str(ii)
-            mean_metric[key] = float(mean_metric[key] / test_data)
-    return mean_metric
+        with torch.no_grad():
+            image_out = model(image.cuda())
+            image_out = image_out * 0.5 + 0.5
+            image_ori = image_ori * 0.5 + 0.5
+        for ori, out in zip(image_ori, image_out):
+            ori = ori.detach().cpu().numpy() * 255.0
+            ori = ori.transpose((1, 2, 0))
+
+            out = out.detach().cpu().numpy() * 255.0
+            out = out.transpose((1, 2, 0))
+
+            psnr, ssim = compute_psnr_and_ssim(ori.astype(np.uint8),
+                                               out.astype(np.uint8), border_size=2)
+            mean_psnr += psnr
+            mean_ssim += ssim
+            test_data += 1
+
+    mean_ssim /= test_data
+    mean_psnr /= test_data
+    return {"psnr": mean_psnr, "ssim": mean_ssim}
 
 
 def train(opt):
@@ -65,72 +58,56 @@ def train(opt):
                                   shuffle=True, num_workers=opt.nThreads)
     dataloader_test = DataLoader(dataset_test, batch_size=opt.batchSize,
                                  shuffle=False, num_workers=opt.nThreads)
-    models = {}
-    optimizers = {}
-    lrschedulrs = {}
-    best_psnrs = {}
-    for j in range(2, 6):
-        for i in range(3, 8):
-            models[str(j) + str(i)] = StainNet(opt.input_nc, opt.output_nc, j, 2 ** i, kernel_size=1)
-            models[str(j) + str(i)] = nn.DataParallel(models[str(j) + str(i)]).cuda()
-            optimizers[str(j) + str(i)] = SGD(models[str(j) + str(i)].parameters(), lr=opt.lr, momentum=0.9)
-            lrschedulrs[str(j) + str(i)] = lr_scheduler.CosineAnnealingLR(optimizers[str(j) + str(i)], opt.epoch)
-            best_psnrs[str(j) + str(i)] = 0
+    model = StainNet(opt.input_nc, opt.output_nc, opt.n_layer, opt.channels)
+    model = nn.DataParallel(model).cuda()
+    optimizer = SGD(model.parameters(), lr=opt.lr)
     loss_function = torch.nn.L1Loss()
+    lrschedulr = lr_scheduler.CosineAnnealingLR(optimizer, opt.epoch)
     vis = Visualizer(env=opt.name)
+    best_psnr = 0
     for i in range(opt.epoch):
         for j, (source_image, target_image) in tqdm(enumerate(dataloader_train)):
             target_image = target_image.cuda()
             source_image = source_image.cuda()
-            for jj in range(2, 6):
-                for ii in range(3, 8):
-                    output = models[str(jj) + str(ii)](source_image)
-                    loss = loss_function(output, target_image)
-                    optimizers[str(jj) + str(ii)].zero_grad()
-                    loss.backward()
-                    optimizers[str(jj) + str(ii)].step()
+            output = model(source_image)
+            loss = loss_function(output, target_image)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
             if (j + 1) % opt.display_freq == 0:
                 vis.plot("loss", float(loss))
                 vis.img("target image", target_image[0] * 0.5 + 0.5)
                 vis.img("source image", source_image[0] * 0.5 + 0.5)
                 vis.img("output", (output[0] * 0.5 + 0.5).clamp(0, 1))
-        if (i + 1) % 1 == 0:
-            test_result = test(models, dataloader_test)
+        if (i + 1) % 5 == 0:
+            test_result = test(model, dataloader_test)
             vis.plot_many(test_result)
-            for jj in range(2, 6):
-                for ii in range(3, 8):
-                    if best_psnrs[str(jj) + str(ii)] < test_result[str(jj) + str(ii)]:
-                        save_path = "{}/{}_best_psnr_layer{}_ch{}.pth".format(opt.checkpoints_dir, opt.name,
-                                                                              jj, 2 ** ii)
-                        best_psnrs[str(jj) + str(ii)] = test_result[str(jj) + str(ii)]
-                        torch.save(models[str(jj) + str(ii)].module.state_dict(), save_path)
-                        print(save_path, test_result)
-        for jj in range(2, 6):
-            for ii in range(3, 8):
-                lrschedulrs[str(jj) + str(ii)].step()
-                print("lrschedulr %s=" % (str(jj) + str(ii)), lrschedulrs[str(jj) + str(ii)].get_last_lr())
+            if best_psnr < test_result["psnr"]:
+                save_path = "{}/{}_best_psnr_layer{}_ch{}.pth".format(opt.checkpoints_dir, opt.name, opt.n_layer,
+                                                                      opt.channels)
+                best_psnr = test_result["psnr"]
+                torch.save(model.module.state_dict(), save_path)
+                print(save_path, test_result)
+        lrschedulr.step()
+        print("lrschedulr=", lrschedulr.get_last_lr())
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--name", default="StainNet-3x0", type=str,
+    parser.add_argument("--name", default="StainNet", type=str,
                         help="name of the experiment.")
-    parser.add_argument("--source_root_train", default="/media/khtao/My_Book/Dataset/StainNet_Dataset/train/source",
-                        type=str,
+    parser.add_argument("--source_root_train", default="dataset/Cytopathology/train/trainA", type=str,
                         help="path to source images for training")
-    parser.add_argument("--gt_root_train", default="/media/khtao/My_Book/Dataset/StainNet_Dataset/train/StainGAN",
-                        type=str,
+    parser.add_argument("--gt_root_train", default="dataset/Cytopathology/train/trainB", type=str,
                         help="path to ground truth images for training")
-    parser.add_argument("--source_root_test", default="/media/khtao/My_Book/Dataset/StainNet_Dataset/test/source",
-                        type=str,
+    parser.add_argument("--source_root_test", default="dataset/Cytopathology/test/testA", type=str,
                         help="path to source images for test")
-    parser.add_argument("--gt_root_test", default="/media/khtao/My_Book/Dataset/StainNet_Dataset/test/StainGAN",
-                        type=str,
+    parser.add_argument("--gt_root_test", default="dataset/Cytopathology/test/testB", type=str,
                         help="path to ground truth images for test")
     parser.add_argument('--input_nc', type=int, default=3, help='# of input image channels')
     parser.add_argument('--output_nc', type=int, default=3, help='# of output image channels')
     parser.add_argument('--channels', type=int, default=32, help='# of channels in StainNet')
-    parser.add_argument('--n_layer', type=int, default=4, help='# of layers in StainNet')
+    parser.add_argument('--n_layer', type=int, default=3, help='# of layers in StainNet')
     parser.add_argument('--batchSize', type=int, default=10, help='input batch size')
     parser.add_argument('--nThreads', default=4, type=int, help='# threads for loading data')
     parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
@@ -138,9 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--display_freq', type=int, default=50, help='frequency of showing training results on screen')
     parser.add_argument('--test_freq', type=int, default=5, help='frequency of cal')
     parser.add_argument('--lr', type=float, default=0.01, help='initial learning rate for SGD')
-    parser.add_argument('--epoch', type=int, default=200, help='how many epoch to train')
-    parser.add_argument('--device_ids', type=str, default="0,1", help='how many epoch to train')
+    parser.add_argument('--epoch', type=int, default=300, help='how many epoch to train')
 
     args = parser.parse_args()
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.device_ids
     train(opt=args)

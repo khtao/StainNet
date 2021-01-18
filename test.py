@@ -10,11 +10,10 @@ import staintools
 import torch
 from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 from torch.utils.data import DataLoader
-import shutil
+from tqdm import tqdm
+
 from models import StainNet, ResnetGenerator
 from utils import list_file_tree, SingleImage
-from tqdm import tqdm
-import subprocess
 
 
 def detect_image(opt, model):
@@ -125,48 +124,10 @@ def test_result(opt):
     return mean_ssim, mean_psnr, mean_ssim_source
 
 
-def khan(source, target):
-    shutil.copy(source, "source.jpg")
-    fs = open("khan/filename.txt", "w")
-    fs.write("source.jpg" + "\n")
-    fs.close()
-    subprocess.run("wine khan/ColourNormalisation.exe BimodalDeconvRVM "
-                   "khan/filename.txt " + target + " khan/HE.colourmodel",
-                   shell=True)
-    return imageio.imread("normalised/source.jpg")
-
-
-def khan_method(opt):
-    image_source = list_file_tree(opt.source_dir, "png")
-    image_target = list_file_tree(opt.gt_dir, "png")
-    image_source.sort()
-    image_target.sort()
-    os.makedirs("normalised", exist_ok=True)
-    if opt.random_target:
-        num = random.randint(0, len(image_target) - 1)
-        save_path = os.path.join(opt.save_root, opt.method + "_random")
-        os.makedirs(save_path, exist_ok=True)
-        print("target choose:", image_target[num])
-        for source in image_source:
-            image = khan(source, image_target[num])
-            filename = os.path.split(source)[1]
-            imageio.imwrite(os.path.join(save_path, filename[:-4] + ".png"), image)
-
-    else:
-        save_path = os.path.join(opt.save_root, opt.method + "_matched")
-        os.makedirs(save_path, exist_ok=True)
-        for source, target in zip(image_source, image_target):
-            image = khan(source, target)
-            filename = os.path.split(source)[1]
-            imageio.imwrite(os.path.join(save_path, filename[:-4] + ".png"), image)
-
-    return save_path
-
-
 def test_methods(opt):
     opt.save_root = os.path.split(opt.source_dir)[0]
     if opt.method == "StainNet":
-        model = StainNet(opt.input_nc, opt.output_nc, opt.n_layer, opt.channels, kernel_size=7)
+        model = StainNet(opt.input_nc, opt.output_nc, opt.n_layer, opt.channels)
         model = model.cuda()
         model.load_state_dict(torch.load(opt.model_path))
         model.eval()
@@ -179,8 +140,6 @@ def test_methods(opt):
         opt.result_dir = detect_image(opt, model)
     elif opt.method in ["reinhard", "macenko", "vahadane"]:
         opt.result_dir = traditional_methods(opt)
-    elif opt.method == "khan":
-        opt.result_dir = khan_method(opt)
     else:
         raise RuntimeError("Not implemented Error!")
     print("result save to ", opt.result_dir)
@@ -193,37 +152,15 @@ def test_methods(opt):
         print("test result save to ", os.path.join(opt.result_dir, "result.txt"))
 
 
-def test_models(opt):
-    opt.save_root = os.path.split(opt.source_dir)[0]
-    # for j in range(2, 6):
-    #     for i in range(3, 9):
-    model = StainNet(opt.input_nc, opt.output_nc, 3, 32, kernel_size=1)
-    model = model.cuda()
-    opt.model_path = "/home/khtao/workplace/MEGA/研究生学习/StainNet/checkpoints/" \
-                     "stainnet_new/StainNet-3x0_best_psnr_layer3_ch32.pth"
-    model.load_state_dict(torch.load(opt.model_path))
-    model.eval()
-    opt.result_dir = detect_image(opt, model)
-    # mean_ssim, mean_psnr, mean_ssim_source = test_result(opt)
-    # fs = open(os.path.join(opt.result_dir, "result.txt"), "a+")
-    # fs.write(
-    #     "{}, SSIM GT:{}, PSNR GT:{}, SSIM Source:{}\n".format(datetime.now(), mean_ssim, mean_psnr,
-    #                                                           mean_ssim_source))
-    # print("test result save to ", os.path.join(opt.result_dir, "result.txt"))
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--save_root", type=str,
-                        help="path to result images for test")
-    parser.add_argument("--result_dir", type=str,
-                        help="path to result images for test")
-    parser.add_argument("--source_dir", default="/home/khtao/kkk", type=str,
+    parser.add_argument("--source_dir", type=str, required=True,
                         help="path to source images for test")
-    parser.add_argument("--gt_dir", default="/home/khtao/视频/tttt/target", type=str,
+    parser.add_argument("--gt_dir", type=str, required=True,
                         help="path to ground truth images for test")
     parser.add_argument("--method", default="StainNet", type=str,
-                        help="different methods for test must be one of { StainNet StainGAN reinhard macenko vahadane khan }")
+                        help="different methods for test must be one of "
+                             "{ StainNet StainGAN reinhard macenko vahadane khan }")
     parser.add_argument('--test_ssim', action="store_true", default=True,
                         help='whether calculate SSIM , default is False')
     parser.add_argument('--random_target', action="store_true", default=False,
@@ -233,11 +170,8 @@ if __name__ == '__main__':
     parser.add_argument('--output_nc', type=int, default=3, help='# of output image channels')
     parser.add_argument('--channels', type=int, default=32, help='# of channels in StainNet')
     parser.add_argument('--n_layer', type=int, default=3, help='# of layers in StainNet')
-    parser.add_argument('--model_path', type=str,
-                        default='checkpoints/StainNet-7x7_best_psnr_layer3_ch32.pth',
+    parser.add_argument('--model_path', type=str, required=True,
                         help='models path to load')
 
     args = parser.parse_args()
-    # print(args)
-    # print("args.test_ssim", args.test_ssim)
-    test_models(opt=args)
+    test_methods(opt=args)
