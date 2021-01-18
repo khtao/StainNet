@@ -3,15 +3,16 @@ import torch.nn as nn
 
 
 class StainNet(nn.Module):
-    def __init__(self, input_nc=3, output_nc=3, n_layer=3, n_channel=32):
+    def __init__(self, input_nc=3, output_nc=3, n_layer=3, n_channel=32, kernel_size=1):
         super(StainNet, self).__init__()
         model_list = []
-        model_list.append(nn.Conv2d(input_nc, n_channel, kernel_size=1, bias=True))
+        model_list.append(nn.Conv2d(input_nc, n_channel, kernel_size=kernel_size, bias=True, padding=kernel_size // 2))
         model_list.append(nn.ReLU(True))
         for n in range(n_layer - 2):
-            model_list.append(nn.Conv2d(n_channel, n_channel, kernel_size=1, bias=True))
+            model_list.append(
+                nn.Conv2d(n_channel, n_channel, kernel_size=kernel_size, bias=True, padding=kernel_size // 2))
             model_list.append(nn.ReLU(True))
-        model_list.append(nn.Conv2d(n_channel, output_nc, kernel_size=1, bias=True))
+        model_list.append(nn.Conv2d(n_channel, output_nc, kernel_size=kernel_size, bias=True, padding=kernel_size // 2))
 
         self.rgb_trans = nn.Sequential(*model_list)
 

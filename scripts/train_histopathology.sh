@@ -1,1 +1,0 @@
-python train.py --name StainNet_Histopathology  --source_root_train=dataset/Histopathology/train/trainA --gt_root_train=dataset/Histopathology/train/StainGAN  --source_root_test=dataset/Histopathology/test/testA --gt_root_test=dataset/Histopathology/test/StainGAN

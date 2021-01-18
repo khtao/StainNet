@@ -134,8 +134,10 @@ class ImageDataset(dataset.Dataset):
         self.seg_path = seg_path
         self.transform = transform
         self.augment = augment
-        self.image_list = list_file_tree(os.path.join(data_path), "jpg")
+        self.image_list = list_file_tree(os.path.join(data_path), "png")
+        self.image_list += list_file_tree(os.path.join(data_path), "jpg")
         self.seg_list = list_file_tree(os.path.join(seg_path), "png")
+        self.seg_list += list_file_tree(os.path.join(seg_path), "jpg")
 
         assert len(self.image_list) == len(self.seg_list)
         self.image_list.sort()
@@ -167,7 +169,8 @@ class SingleImage(dataset.Dataset):
         self.data_path = data_path
         self.transform = transform
         self.augment = augment
-        self.image_list = list_file_tree(os.path.join(data_path), "jpg")
+        self.image_list = list_file_tree(os.path.join(data_path), "png")
+        self.image_list += list_file_tree(os.path.join(data_path), "jpg")
         # assert len(self.image_list) == len(self.cyt_list)
         self.image_list.sort()
 
@@ -178,3 +181,98 @@ class SingleImage(dataset.Dataset):
         img = Image.open(self.image_list[item])
         img = (np.array(img, dtype=np.float32) / 255.0).transpose((2, 0, 1))
         return img
+
+
+class incre_std_avg():
+    '''
+    增量计算海量数据平均值和标准差,方差
+    1.数据
+    obj.avg为平均值
+    obj.std为标准差
+    obj.n为数据个数
+    对象初始化时需要指定历史平均值,历史标准差和历史数据个数(初始数据集为空则可不填写)
+    2.方法
+    obj.incre_in_list()方法传入一个待计算的数据list,进行增量计算,获得新的avg,std和n(海量数据请循环使用该方法)
+    obj.incre_in_value()方法传入一个待计算的新数据,进行增量计算,获得新的avg,std和n(海量数据请将每个新参数循环带入该方法)
+    '''
+
+    def __init__(self, h_avg=0, h_std=0, n=0):
+        self.avg = h_avg
+        self.std = h_std
+        self.n = n
+
+    def incre_in_list(self, new_list):
+        avg_new = np.mean(new_list, dtype=np.longdouble)
+        incre_avg = (self.n * self.avg + len(new_list) * avg_new) / \
+                    (self.n + len(new_list))
+        std_new = np.std(new_list, dtype=np.longdouble)
+        incre_std = np.sqrt((self.n * (self.std ** 2 + (incre_avg - self.avg) ** 2) + len(new_list)
+                             * (std_new ** 2 + (incre_avg - avg_new) ** 2)) / (self.n + len(new_list)),
+                            dtype=np.longdouble)
+        self.avg = incre_avg
+        self.std = incre_std
+        self.n += len(new_list)
+
+    def incre_in_value(self, value):
+        incre_avg = (self.n * self.avg + value) / (self.n + 1)
+        incre_std = np.sqrt((self.n * (self.std ** 2 + (incre_avg - self.avg)
+                                       ** 2) + (incre_avg - value) ** 2) / (self.n + 1), dtype=np.longdouble)
+        self.avg = incre_avg
+        self.std = incre_std
+        self.n += 1
+
+    def incre_in_std_mean(self, num, mean, std):
+        incre_avg = (self.n * self.avg + num * mean) / (self.n + num)
+        incre_std = np.sqrt((self.n * (self.std ** 2 + (incre_avg - self.avg) ** 2) + num
+                             * (std ** 2 + (incre_avg - mean) ** 2)) / (self.n + num),
+                            dtype=np.longdouble)
+        self.avg = incre_avg
+        self.std = incre_std
+        self.n += num
+
+
+if __name__ == '__main__':
+    import shutil
+    import torch
+    from datetime import datetime
+
+    files = list_file_tree("/media/khtao/My_Book/Dataset/StainNet_Dataset/test/source", "png")
+    for tt in ["StainNet", "StainGAN", "reinhard_random", "reinhard_matched", "macenko_random", "macenko_matched",
+               "vahadane_matched", "vahadane_random"]:
+        target = "/home/khtao/data/colornet/color_net_new/" + tt
+        save_path = "/media/khtao/My_Book/Dataset/StainNet_Dataset/test/" + tt
+        os.makedirs(save_path, exist_ok=True)
+        all_metirc = torch.load(os.path.join(target, "all_metirc.data"))
+        all_metirc_files = [os.path.split(k[0])[1] for k in all_metirc]
+        all_metirc_new = []
+        for file in files:
+            filename = os.path.split(file)[1]
+            shutil.copy(os.path.join(target, filename),
+                        os.path.join(save_path, filename))
+            k = all_metirc_files.index(filename)
+            all_metirc_new.append(all_metirc[k])
+            print(filename, all_metirc[k][0])
+        mean_ssim = sum([k[1]["ssim"] for k in all_metirc_new]) / len(all_metirc_new)
+        mean_psnr = sum([k[1]["psnr"] for k in all_metirc_new]) / len(all_metirc_new)
+        mean_ssim_source = sum([k[1]["ssim_source"] for k in all_metirc_new]) / len(all_metirc_new)
+        print(tt, mean_ssim, mean_psnr, mean_ssim_source)
+        torch.save(all_metirc, os.path.join(save_path, "all_metirc.data"))
+        fs = open(os.path.join(save_path, "result.txt"), "a+")
+        fs.write(
+            "{}, SSIM GT:{}, PSNR GT:{}, SSIM Source:{}\n".format(datetime.now(), mean_ssim, mean_psnr,
+                                                                  mean_ssim_source))
+
+    #
+    # np.random.shuffle(files)
+    # total = len(files)
+    # test_num = int(total * 0.3)
+    # train_num = total - test_num
+    # for file in files[:test_num]:
+    #     filename = os.path.split(file)[1]
+    #     shutil.copy(file, os.path.join(save_path, "test", "source", filename))
+    #     shutil.copy(file.replace("dataA", "dataB"), os.path.join(save_path, "test", "target", filename))
+    #
+    # for file in files[test_num:]:
+    #     filename = os.path.split(file)[1]
+    #     shutil.copy(file, os.path.join(save_path, "train", "source", filename))
+    #     shutil.copy(file.replace("dataA", "dataB"), os.path.join(save_path, "train", "target", filename))

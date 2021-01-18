@@ -1,1 +1,0 @@
-python train.py --name StainNet_Cytopathology --source_root_train=dataset/Cytopathology/train/trainB --gt_root_train=dataset/Cytopathology/train/StainGAN  --source_root_test=dataset/Cytopathology/test/testB --gt_root_test=dataset/Cytopathology/test/StainGAN
