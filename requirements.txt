@@ -7,7 +7,6 @@ imageio
 scikit_image
 visdom
 tqdm
-openslide_python
 imgaug
 Pillow
 scikit-image
