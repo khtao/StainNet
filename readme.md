@@ -16,6 +16,9 @@ Python 3.6 or later with all [requirements.txt](https://github.com/khtao/StainNe
 pip install -r requirements.txt
 ```
 
+链接：https://pan.baidu.com/s/1_k7l3wL0vrP26Yc6kkcWEQ 
+提取码：wrfi
+
 ## 3、Testing and Training
 
 ```bash
