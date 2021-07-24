@@ -17,29 +17,17 @@ from utils import compute_psnr_and_ssim
 def test(model, test_dataloader):
     model.eval()
     total = len(test_dataloader)
-    mean_psnr, mean_ssim = 0.0, 0.0
+    mean_loss = 0.0
     test_data = 0
+    loss_function = torch.nn.L1Loss()
     for i, (image, image_ori) in tqdm(enumerate(test_dataloader), total=total):
         with torch.no_grad():
             image_out = model(image.cuda())
-            image_out = image_out * 0.5 + 0.5
-            image_ori = image_ori * 0.5 + 0.5
-        for ori, out in zip(image_ori, image_out):
-            ori = ori.detach().cpu().numpy() * 255.0
-            ori = ori.transpose((1, 2, 0))
-
-            out = out.detach().cpu().numpy() * 255.0
-            out = out.transpose((1, 2, 0))
-
-            psnr, ssim = compute_psnr_and_ssim(ori.astype(np.uint8),
-                                               out.astype(np.uint8), border_size=2)
-            mean_psnr += psnr
-            mean_ssim += ssim
+            loss = loss_function(image_out, image_ori.cuda())
+            mean_loss += loss.item()
             test_data += 1
-
-    mean_ssim /= test_data
-    mean_psnr /= test_data
-    return {"psnr": mean_psnr, "ssim": mean_ssim}
+    mean_loss /= test_data
+    return {"mean_loss": mean_loss}
 
 
 def train(opt):
@@ -79,13 +67,13 @@ def train(opt):
                 vis.img("target image", target_image[0] * 0.5 + 0.5)
                 vis.img("source image", source_image[0] * 0.5 + 0.5)
                 vis.img("output", (output[0] * 0.5 + 0.5).clamp(0, 1))
-        if (i + 1) % 5 == 0:
+        if (i + 1) % opt.test_freq == 0:
             test_result = test(model, dataloader_test)
             vis.plot_many(test_result)
-            if best_psnr < test_result["psnr"]:
-                save_path = "{}/{}_best_psnr_layer{}_ch{}.pth".format(opt.checkpoints_dir, opt.name, opt.n_layer,
-                                                                      opt.channels)
-                best_psnr = test_result["psnr"]
+            if mean_loss > test_result["mean_loss"]:
+                save_path = "{}/{}_layer{}_ch{}.pth".format(opt.checkpoints_dir, opt.name, opt.n_layer,
+                                                            opt.channels)
+                mean_loss = test_result["mean_loss"]
                 torch.save(model.module.state_dict(), save_path)
                 print(save_path, test_result)
         lrschedulr.step()
