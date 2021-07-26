@@ -1,11 +1,13 @@
-import numpy as np
 import time
+
+import numpy as np
 import staintools
 import torch
 import torch.nn as nn
-from tqdm import tqdm
-from models import StainNet, ResnetGenerator
 from PIL import Image
+from tqdm import tqdm
+
+from models import StainNet, ResnetGenerator
 
 # read source image
 img_source = Image.open("assets/3_color_net_neg23570_ori.png")

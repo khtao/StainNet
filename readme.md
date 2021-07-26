@@ -64,7 +64,7 @@ python test.py -h
 ```
 
 ```shell
-python train.py -h
+python train_StainNet.py -h
   --name NAME           name of the experiment.
   --source_root_train SOURCE_ROOT_TRAIN
                         path to source images for training

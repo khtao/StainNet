@@ -9,5 +9,9 @@ visdom
 tqdm
 imgaug
 Pillow
-scikit-image
+scikit-image~
 spams
+
+opencv-python
+lmdb
+torchvision

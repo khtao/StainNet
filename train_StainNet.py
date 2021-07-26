@@ -1,7 +1,6 @@
 import argparse
 
 import imgaug.augmenters as iaa
-import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import SGD, lr_scheduler
@@ -11,7 +10,6 @@ from tqdm import tqdm
 from models import StainNet
 from utils import ImageDataset
 from utils import Visualizer
-from utils import compute_psnr_and_ssim
 
 
 def test(model, test_dataloader):

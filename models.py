@@ -1,5 +1,19 @@
 import functools
 import torch.nn as nn
+from torchvision.models import squeezenet1_1
+
+
+class SqueezeNet(nn.Module):
+    def __init__(self, n_class=2):
+        super(SqueezeNet, self).__init__()
+        self.n_class = n_class
+        self.base_model = squeezenet1_1(pretrained=True)
+        temp = squeezenet1_1(pretrained=False, num_classes=n_class)
+        self.base_model.classifier = temp.classifier
+        del temp
+
+    def forward(self, x):
+        return self.base_model(x)
 
 
 class StainNet(nn.Module):
@@ -18,29 +32,6 @@ class StainNet(nn.Module):
 
     def forward(self, x):
         return self.rgb_trans(x)
-
-
-class StainNet2(nn.Module):
-    def __init__(self, input_nc=3, output_nc=3, n_layer=3, n_channel=32):
-        super(StainNet2, self).__init__()
-        model_list = []
-        model_list.append(nn.Conv2d(input_nc, n_channel, kernel_size=1, bias=True))
-        model_list.append(nn.ReLU(True))
-        for n in range(n_layer - 2):
-            model_list.append(nn.Conv2d(n_channel, n_channel, kernel_size=1, bias=True))
-            model_list.append(nn.ReLU(True))
-        model_list.append(nn.Conv2d(n_channel, output_nc, kernel_size=1, bias=True))
-
-        self.rgb_trans = nn.ModuleList(model_list)
-
-    def forward(self, x):
-        out = []
-        for i, module in enumerate(self.rgb_trans):
-            x = module(x)
-            if i % 2 != 0:
-                out.append(x)
-        out.append(x)
-        return out
 
 
 class ResnetGenerator(nn.Module):

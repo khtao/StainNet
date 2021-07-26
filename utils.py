@@ -1,23 +1,21 @@
 import os
-from glob import glob
 import time
+from glob import glob
+
+import lmdb
 import numpy as np
 import visdom
-from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 from PIL import Image
-from torch.utils.data import dataset
 from imgaug.augmentables.segmaps import SegmentationMapsOnImage
+from skimage.metrics import structural_similarity, peak_signal_noise_ratio
+from torch.utils.data import dataset
+from tqdm import tqdm
 
 
 def list_file_tree(path, file_type="tif"):
-    image_list = list()
-    dir_list = os.listdir(path)
-    if os.path.isdir(path):
-        image_list += glob(os.path.join(path, "*" + file_type))
-    for dir_name in dir_list:
-        sub_path = os.path.join(path, dir_name)
-        if os.path.isdir(sub_path):
-            image_list += list_file_tree(sub_path, file_type)
+    if file_type.find("*") < 0:
+        file_type = "*" + file_type
+    image_list = glob(os.path.join(path, "*" + file_type), recursive=True)
     return image_list
 
 
@@ -126,6 +124,66 @@ def compute_psnr_and_ssim(image1, image2, border_size=0):
                                  K2=0.03,
                                  sigma=1.5, data_range=255)
     return psnr, ssim
+
+
+class ImageClassDataset(dataset.Dataset):
+    def __init__(self, pos_path, neg_path, use_lmdb=False, augment=None, transform=None):
+        self.pos_path = pos_path
+        self.neg_path = neg_path
+        self.augment = augment
+        self.use_lmdb = use_lmdb
+        self.transform = transform
+        self.pos_list = list_file_tree(pos_path, "png")
+        self.neg_list = list_file_tree(neg_path, "png")
+        self.image_list = self.pos_list + self.neg_list
+        if self.use_lmdb:
+            self.lmdb = self.make_lmdb(os.path.join(self.pos_path, "lmdb"))
+
+    def __len__(self):
+        return len(self.image_list)
+
+    def make_lmdb(self, path):
+        length = len(self.image_list)
+        if os.path.exists(path):
+            env = lmdb.open(path, map_size=10737418240)
+            txn = env.begin()
+            num = txn.get("len".encode())
+            if num is None or int(txn.get("len".encode())) != length:
+                os.remove(path + "/data.mdb")
+                os.remove(path + "/lock.mdb")
+            else:
+                return txn
+        env = lmdb.open(path, map_size=10737418240)
+        txn = env.begin(write=True)
+        for idx in tqdm(range(length)):
+            image = Image.open(self.image_list[idx]).convert("RGB").resize((256, 256))
+            label = 1 if idx < len(self.pos_list) else 0
+            label = str(label)
+            buff = cv2.imencode(".png", np.array(image, dtype=np.uint8))[1]
+            txn.put(key=("image" + str(idx)).encode(), value=buff.tobytes())
+            txn.put(key=("label" + str(idx)).encode(), value=label.encode())
+        txn.put(key="len".encode(), value=str(length).encode())
+        txn.commit()
+        return env.begin()
+
+    def __getitem__(self, item):
+        if self.use_lmdb:
+            image = self.lmdb.get(key=("image" + str(item)).encode())
+            label = self.lmdb.get(key=("label" + str(item)).encode())
+            label = int(label.decode())
+            image = np.frombuffer(image, dtype=np.uint8)
+            image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+            image = Image.fromarray(image)
+        else:
+            image = Image.open(self.image_list[item]).convert("RGB").resize((256, 256))
+            label = 1 if item < len(self.pos_list) else 0
+        if self.augment:
+            image = self.augment(image)
+        image = np.array(image)
+        if self.transform:
+            image = self.transform(image=image)
+        image = (np.array(image, dtype=np.float32) - 128).transpose((2, 0, 1)) / 128.0
+        return image, label
 
 
 class ImageDataset(dataset.Dataset):
