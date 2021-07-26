@@ -52,7 +52,7 @@ def train(opt):
     loss_function = torch.nn.L1Loss()
     lrschedulr = lr_scheduler.CosineAnnealingLR(optimizer, opt.epoch)
     vis = Visualizer(env=opt.name)
-    best_psnr = 0
+    mean_loss = 100
     for i in range(opt.epoch):
         for j, (source_image, target_image) in tqdm(enumerate(dataloader_train)):
             target_image = target_image.cuda()

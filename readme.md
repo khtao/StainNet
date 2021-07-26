@@ -1,6 +1,6 @@
 # StainNet: a fast and robust stain normalization network
 
-The code for StainNet with url: https://arxiv.org/abs/2012.12535
+The code and dataset  for StainNet with url: https://arxiv.org/abs/2012.12535
 
 ## 1、Our approach
 
@@ -16,10 +16,34 @@ Python 3.6 or later with all [requirements.txt](https://github.com/khtao/StainNe
 pip install -r requirements.txt
 ```
 
-链接：https://pan.baidu.com/s/1_k7l3wL0vrP26Yc6kkcWEQ 
-提取码：wrfi
+## 3、Dataset Download
 
-## 3、Testing and Training
+We make the aligned histopathology dataset and the histopathology classification dataset in our paper publicly available.  They can be downloaded from BaiduYun as follow:
+
+BaiduYun url:https://pan.baidu.com/s/1_k7l3wL0vrP26Yc6kkcWEQ 
+Extraction code：wrfi
+
+The related descriptions are below:
+
+| Filename                      | Descriptions                                                 |
+| ----------------------------- | ------------------------------------------------------------ |
+| aperio_hamamatsu.zip          | The aligned histopathology dataset from the publicly available part of the MITOS-ATYPIA ICPR’14 challenge. |
+| camelyon16.zip                | The histopathology classification dataset from the publicly available Camelyon16 dataset for train classifier |
+| camelyon16_for_train_norm.zip | From the publicly available Camelyon16 dataset for train normalization model |
+
+## 4、Train StainGAN 
+
+```bash
+git clone https://github.com/khtao/StainGAN.git
+cd StainGAN
+# train the aligned histopathology dataset
+python train.py --dataroot  aperio_hamamatsu/train --phaseA aperio  --phaseB hamamatsu --batchSize 4 --niter 25  --niter_decay 25 --loadSize 256 --fineSize 256 --name aperio_hamamatsu --display_env aperio-hamamatsu --model cycle_gan --no_dropout 
+
+# train the histopathology classification dataset for norm 
+python train.py --dataroot  camelyon16_for_train_norm --phaseA centerUni  --phaseB centerRad --batchSize 4 --niter 100  --niter_decay 100 --loadSize 256 --fineSize 256 --name aperio_hamamatsu --display_env aperio-hamamatsu --model cycle_gan --no_dropout 
+```
+
+## 5、Train and Test StainNet
 
 ```bash
 python test.py -h
