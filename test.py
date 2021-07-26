@@ -24,7 +24,6 @@ def detect_image(opt, model):
                             drop_last=False)
     file_list = dataset.image_list
     save_path = os.path.join(opt.save_root, os.path.split(opt.model_path)[1][:-4])
-    os.makedirs(save_path, exist_ok=True)
     num = 0
     for imgs in tqdm(dataloader):
         with torch.no_grad():
@@ -36,6 +35,7 @@ def detect_image(opt, model):
         for out in outputs:
             file_path = file_list[num]
             file_path = os.path.join(save_path, os.path.split(file_path)[1])
+            os.makedirs(os.path.split(file_path)[0], exist_ok=True)
             imageio.imwrite(file_path[:-4] + ".png",
                             (out * 255).astype(np.uint8).transpose((1, 2, 0)))
             num += 1

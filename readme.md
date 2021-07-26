@@ -100,3 +100,12 @@ python train_StainNet.py -h
 python test_fps.py
 ```
 
+## 6、Train and eval Classifier
+
+```bash
+#train Classifier
+python train_Classifier.py
+#evel Classifier
+python eval_Classifier.py
+```
+
