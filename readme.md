@@ -1,6 +1,7 @@
 # StainNet: a fast and robust stain normalization network
 
-The code and dataset  for StainNet with url: https://arxiv.org/abs/2012.12535
+The code and dataset  for StainNet with url: https://doi.org/10.3389/fmed.2021.746307
+please cite our paper if you use the code or dataset
 
 ## 1、Our approach
 
